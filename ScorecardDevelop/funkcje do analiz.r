@@ -292,7 +292,8 @@ univariate_anal_stats<-function(x,y,czas,proby=rep(TRUE, length(y)),
 		interactive=FALSE, min_bucket=floor(0.05*length(x)), breaks=NULL,
 		mapping=NULL, forceContinous=FALSE, 
 		special_val=numeric_var_treatment.params$spcial_val, 
-		NA_subst=numeric_var_treatment.params$NA_substit){
+		NA_subst=numeric_var_treatment.params$NA_substit,
+		span=0.9){
 	
 	# zamieniam braki danych na liczbê.
 	if (is.numeric(x) & !is.null(NA_subst))
@@ -303,7 +304,7 @@ univariate_anal_stats<-function(x,y,czas,proby=rep(TRUE, length(y)),
 	stat1<-univariate_anal_stats1b(x,y, special_val=special_val,
 			max_gleb=3,plot=FALSE, min_bucket=min_bucket,
 			interactive=interactive, breaks=breaks, mapping=mapping,
-			forceContinous=forceContinous);
+			forceContinous=forceContinous, span=span);
 	
 	stat2<-NULL;
 	stat3<-NULL;
@@ -324,7 +325,7 @@ univariate_anal_stats<-function(x,y,czas,proby=rep(TRUE, length(y)),
 		
 		# wyliczam trzecie statystyki (GINI) po zadanych próbach i czasie
 		
-		stat3<-univariate_anal_stats3(-BR_discr, y, czas, proby);
+		stat3<-univariate_anal_stats3(score=-BR_discr, y, czas, proby);
 	}
 	return(list(dyskretyzacja=stat1, rozklady=stat2, dyskryminacja=stat3));
 }
@@ -1636,7 +1637,7 @@ univariate_anal_stats4<-function(dane, mapowanie, czas=lastDay(dane$reportingdat
 
 #TODO! Coœ nie dzia³a obs³uga,  gdy w x s¹ NA
 #np. zmienna Wiek
-przypisz2<-function(x, bucket, interpol=FALSE, fitted=NULL, NA_substit=-10000000)
+przypisz2<-function(x, bucket, interpol=FALSE, fitted=NULL, NA_substit=-2147483647)
 {
 	
 	if (!is.null(fitted))
@@ -1655,7 +1656,11 @@ przypisz2<-function(x, bucket, interpol=FALSE, fitted=NULL, NA_substit=-10000000
 		wynik<-rep("<NA>", length(x));
 	#print(bucket)
 	#Jeœli buckety okreœlone s¹ przez warunki mapuj¹ce
-	if (!is.null(bucket$mapping_war) & any(!is.na(bucket$mapping_war))){
+	jest_mapowanie=FALSE
+	if (!is.null(bucket$mapping_war))
+		if(any(!is.na(bucket$mapping_war)))
+			jest_mapowanie=TRUE
+	if (jest_mapowanie){
 		mmm<-data.frame(war=bucket$mapping_war, label=bucket$fitted, discret=bucket$discret)
 		mmm<-mmm[mmm$discret!="<TOTAL>",]
 		wynik<-mapuj(x, mmm[,1:2])
@@ -1746,7 +1751,7 @@ numeric_var_treatment<-function(x, y,
 		special_val=numeric_var_treatment.params$spcial_val,
 		min_bucket=numeric_var_treatment.params$min_bucket, 
 		max_gleb=numeric_var_treatment.params$max_gleb,
-		interactive=FALSE, locfit=FALSE, breaks=NULL,...){
+		interactive=FALSE, locfit=FALSE, breaks=NULL,span=0.9, ...){
 	if (length(x)!=length(y))
 		stop("discretization: parametry 'x' i 'y' maj¹ ró¿ne d³ugoœci!");
 	
@@ -1767,13 +1772,13 @@ numeric_var_treatment<-function(x, y,
 		bucket_drzewo<-buckety_stat2(breaks, x[!special_idx], y[!special_idx], total=FALSE);
 	} else {
 		if (locfit){
-			bucket_drzewo<-try(reg_nieparam(x[!special_idx],y[!special_idx], span=0.9, wytnij=0.01), TRUE)
+			bucket_drzewo<-try(reg_nieparam(x[!special_idx],y[!special_idx], span=span, wytnij=0.01), TRUE)
 			
 			#jeœli wyliczy³o siê z b³êdem, to próbujê jeszcze na dwa sposoby...
 			if (class(bucket_drzewo)=="try-error"){
-				bucket_drzewo<-try(reg_nieparam(x[!special_idx],y[!special_idx], span=0.9, wytnij=0.01, buckets=50), TRUE)
+				bucket_drzewo<-try(reg_nieparam(x[!special_idx],y[!special_idx], span=span, wytnij=0.01, buckets=50), TRUE)
 				if (class(bucket_drzewo)=="try-error"){
-					bucket_drzewo<-try(reg_nieparam(x[!special_idx],y[!special_idx], span=0.9, wytnij=0.01, buckets=30), TRUE)
+					bucket_drzewo<-try(reg_nieparam(x[!special_idx],y[!special_idx], span=span, wytnij=0.01, buckets=30), TRUE)
 					
 					#jeœli wci¹¿ siê nie powiod³o, to zwracamy wartoœæ b³êdu
 					if (class(bucket_drzewo)=="try-error")
@@ -1790,7 +1795,7 @@ numeric_var_treatment<-function(x, y,
 			bucket_drzewo$predicted<-bucket_drzewo$br
 		}else{
 			bucket_drzewo<-interactive_tree(score=x[!special_idx],def=y[!special_idx],
-					span=0.80, min_split=200, min_bucket=min_bucket,
+					span=span, min_split=200, min_bucket=min_bucket,
 					buckets=60, max_gleb=2)
 			bucket_drzewo$predicted<-bucket_drzewo$br
 		}
@@ -1873,7 +1878,8 @@ univariate_anal_stats1b<-function(x,y,
 		interactive=FALSE,
 		breaks=NULL, 
 		mapping=NULL, 
-		forceContinous=FALSE,...){
+		forceContinous=FALSE,
+		span=0.9,...){
 	
 	if (length(x)!=length(y))
 		stop("paramet ry 'x' i 'y' maj¹ ró¿ne d³ugoœci!");
@@ -1946,7 +1952,7 @@ univariate_anal_stats1b<-function(x,y,
 	else{
 		discret<-numeric_var_treatment(x,y, special_val=special_val,
 				max_gleb=max_gleb,min_bucket=min_bucket,breaks=breaks,
-				interactive=interactive, locfit=locfit, ...);
+				interactive=interactive, locfit=locfit, span=span, ...);
 	}
 	
 	discret$label<-rownames(discret);
