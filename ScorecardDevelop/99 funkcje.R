@@ -4,34 +4,8 @@
 ###############################################################################
 
 
-dopasowanie_do_zmiennej<-function( x, bucket, estim, subset=NULL,...){
-	if (!is.null(subset)){
-		x<-x[subset]
-		estim<-estim[subset]
-	}
-	if (any(is.na(estim))){
-		ile_na<-sum(is.na(estim))
-		warning(sprintf("W 'estim' bylo %s brakow danych. Zostaly usuniete.", ile_na))
-		x<-x[!is.na(estim)]
-		estim<-estim[!is.na(estim)]
-	}
-	bucket_new<-bucket
-	bucket$fitted<-rownames(bucket)
-	pred<-przypisz2(x, bucket)
-	estim_bucket<-tapply(estim, pred, mean)
-	bucket_new$model<-estim_bucket[rownames(bucket_new)]
-	plot(bucket_new$nr[-nrow(bucket_new)], bucket_new$br[-nrow(bucket_new)],...)
-	points(bucket_new$nr, bucket_new$model, col="green")
-	bucket_new
-}
 
 
-
-
-korelacje_zmiennych<-function(model, data){
-	zmienne<-names(coef(model))[-1]
-	edit(cor(data[,zmienne]))
-}
 
 
 pokaz_gini<-function(model, subset=rep(TRUE, nrow(woe_wynik)), target=newdata$target, newdata=woe_wynik){
@@ -64,54 +38,10 @@ loadState<-function(filename="modele_int.RDat", dir="D:\\Michal\\IA-0219 Model C
 	load(file)
 }
 
-make_model_formula<-function(target, vars){
-	
-	#jeœli w nazwach zmiennych jest nazwa targetu, to j¹ usuwam
-	czy_jest_target<-target==vars
-	vars<-vars[!czy_jest_target]
-	
-	#suma zmiennych
-	suma_zmiennych<-paste(vars, collapse = ' + ')
-	
-	#wynik
-	formula(paste(target, suma_zmiennych, sep='~'))
-}
-
 
 ## data=woe_wynik
 ## model=model40
 
-#liczê korelacje zmiennych z modelu ze zmiennymi do dodania
-step_bez_kor<-function(data, model){
-	
-	#zmienne w modelu
-	zmienne_model<-names(coef(model)[-1])
-	
-	#zmienne z danych z budowy modelu
-	#zmienne_budowa<-nazwy_zmiennych
-	zmienne_budowa<-names(data)
-	
-	#korelacja miêczy nimi
-	korel<-as.data.frame(cor(data[,zmienne_budowa]))
-	korel_zm_model<-korel[zmienne_model,]
-	
-	#gdzie akceptowalna korelacja
-	korelacje_max<-apply(abs(korel_zm_model), 2, max)
-	czy_przekracza<-as.data.frame(abs(korel_zm_model)>0.75)
-	czy_przekracza<-sapply(czy_przekracza, any)
-	zmienne<-names(czy_przekracza[czy_przekracza==FALSE & !is.na(czy_przekracza)])
-	
-	#usuwam target
-	zmienne<-zmienne[zmienne!='target']
-	
-	#robiê stepa
-	#form<-make_model_formula('target',zmienne_budowa)
-	form<-make_model_formula('target', c(".",zmienne))
-	dodana_zmienne<-add1(model, scope= form, test='Chisq')	
-	kolejnosc_aic<-order(dodana_zmienne$AIC)
-			
-	cbind(dodana_zmienne[kolejnosc_aic,], cor_max=korelacje_max[rownames(dodana_zmienne[kolejnosc_aic,])])
-}
 
 
 
@@ -198,55 +128,13 @@ L1Norm<-function(x){
 
 
 
-
-
-przypisz_z_listy<-function(bucket_list, data, vars=names(bucket_list), colname='fitted', varname_sufix=colname){
-	
-	data_out<-NULL
-	
-	for (zmienna in names(bucket_list)){
-		
-		if (!(zmienna %in% vars)) 
-			next;
-		
-		####   wyliczam   woe    ######
-		
-		#Wyci¹gam element listy
-		bucket<-bucket_list[[zmienna]]
-		#bucket<-bucket[rownames(bucket)!='TOTAL',]
-		
-		#jeœli badów lub goodów jest 0, to przyjmujê ¿e jest 0.5	
-		
-		fitted = bucket[,colname]
-		
-		####   przypisujê woe    ######
-		
-		fitted_x<-przypisz2(data[,zmienna],
-				bucket_list[[zmienna]], 
-				fitted=fitted,
-				NA_subst = numeric_var_treatment.params$NA_substit,
-				interpol=FALSE)
-		
-		if (is.null(data_out))	{
-			data_out <- data.frame(fitted_x)
-			names(data_out)<-zmienna
-		}
-		else
-			data_out[,zmienna] <- c(fitted_x)
-		
-	}
-	
-	names(data_out)<-paste(names(data_out), varname_sufix, sep="_")
-	data_out
-}	
-
-
-
 get_password <- function() {
 	cat("Has³o, buraku!!!: ")
 	system("stty -echo")
 	a <- readline()
 	system("stty echo")
 	cat("\n")
-	return(a)
+	invisible(a)
 }
+
+#get_password()
